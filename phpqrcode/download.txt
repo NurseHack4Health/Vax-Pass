@@ -1,0 +1,3 @@
+Cannot include all files of PHP QR Code library in one commit. Please download phpqrcode library at the link below, and extract files inside this folder.
+
+https://sourceforge.net/code-snapshots/git/p/ph/phpqrcode/git.git/phpqrcode-git-863ffffac4c9d22e522464e325cbcbadfbb26470.zip
