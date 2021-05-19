@@ -27,7 +27,7 @@
                     require __DIR__ . '/../phpqrcode/lib/full/qrlib.php';
                     echo QRcode::svg($_GET['data']); // QR code
                     echo '<br />';
-                    echo '<p><strong>' . Basic::decrypt( base64_decode($_GET['data']), 'PasswordHere', 'vaxv1' ) . '</strong></p>'; // Decrypted QR data
+                    echo '<p><strong>' . Basic::decrypt( base64_decode($_GET['data']), PASS_PHRASE, 'vaxv1' ) . '</strong></p>'; // Decrypted QR data
                     exit;
                 }
 
@@ -40,7 +40,7 @@
                     $location = htmlspecialchars($_POST['location']);
                     $plaintext = $name . ' completed the ' . $dose . ' of the COVID-19 vaccine on ' . $date . ' at ' . $location . '.';
 
-                    $encrypted = Basic::encrypt($plaintext, 'PasswordHere', 'vaxv1');
+                    $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'vaxv1');
                     $data = base64_encode($encrypted);
                     $link = BASE_URL . 'generate?data=' . $data;
 
