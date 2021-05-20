@@ -40,7 +40,7 @@
                     $location = htmlspecialchars($_POST['location']);
 
                     if (! empty($_POST['location'])) setcookie('location', $location); // Remember location
-                    
+
                     $plaintext = $name . ' completed the ' . $dose . ' of the COVID-19 vaccine on ' . $date . ' at ' . $location . '.';
 
                     $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'vaxv1');
@@ -66,15 +66,23 @@
                 <label for="date">Date</label>
                 <input class="form-control" type="date" placeholder="Date" aria-label="Date" name="date" required><br />
                 <label for="location">Location</label>
-                <input class="form-control" type="text" placeholder="Location" aria-label="Location" name="location" value="<?php if (! empty($_COOKIE['location'])) echo $_COOKIE['location']; ?>" required><br />
+                <input class="form-control" type="text" placeholder="Location" aria-label="Location" id="location" name="location" value="<?php if (! empty($_COOKIE['location'])) echo $_COOKIE['location']; ?>" <?php if (! empty($_COOKIE['location'])) echo 'readonly'; ?>><br />
                 <label for="email">Email</label>
                 <input class="form-control" type="email" placeholder="Email" aria-label="Email" name="email" required><br />
-                <button class="btn btn-outline-success my-2 my-sm-0" type="submit" name="generate">Generate</button>
+                <button class="btn btn-outline-success" type="submit" name="generate">Generate</button>
+                <button class="btn btn-outline-primary" type="button" onclick="resetLocation()">Reset Location</button>
                 </form>
                 </div>
             </div>
 
         </main>
+
+        <script>
+        	function resetLocation() {
+        		document.querySelector('#location').value = '';
+        		document.querySelector('#location').removeAttribute('readonly');
+        	}
+        </script>
   
     </body>
 </html>
