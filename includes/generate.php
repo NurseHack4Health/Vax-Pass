@@ -68,6 +68,7 @@
                 <label for="location">Location</label>
                 <input class="form-control" type="text" placeholder="Location" aria-label="Location" id="location" name="location" value="<?php if (! empty($_COOKIE['location'])) echo $_COOKIE['location']; ?>" <?php if (! empty($_COOKIE['location'])) echo 'readonly'; ?>><br />
                 <label for="email">Email</label>
+                <small>(Email functionality disabled.)</small>
                 <input class="form-control" type="email" placeholder="Email" aria-label="Email" name="email" required><br />
                 <button class="btn btn-outline-success" type="submit" name="generate">Generate</button>
                 <button class="btn btn-outline-primary" type="button" onclick="resetLocation()">Reset Location</button>
