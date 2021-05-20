@@ -38,6 +38,9 @@
                     $dose = htmlspecialchars($_POST['dose']);
                     $date = htmlspecialchars($_POST['date']);
                     $location = htmlspecialchars($_POST['location']);
+
+                    if (! empty($_POST['location'])) setcookie('location', $location); // Remember location
+                    
                     $plaintext = $name . ' completed the ' . $dose . ' of the COVID-19 vaccine on ' . $date . ' at ' . $location . '.';
 
                     $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'vaxv1');
@@ -63,7 +66,7 @@
                 <label for="date">Date</label>
                 <input class="form-control" type="date" placeholder="Date" aria-label="Date" name="date" required><br />
                 <label for="location">Location</label>
-                <input class="form-control" type="text" placeholder="Location" aria-label="Location" name="location" value="Vaccine Site Alpha Bravo" readonly><br />
+                <input class="form-control" type="text" placeholder="Location" aria-label="Location" name="location" value="<?php if (! empty($_COOKIE['location'])) echo $_COOKIE['location']; ?>" required><br />
                 <label for="email">Email</label>
                 <input class="form-control" type="email" placeholder="Email" aria-label="Email" name="email" required><br />
                 <button class="btn btn-outline-success my-2 my-sm-0" type="submit" name="generate">Generate</button>
