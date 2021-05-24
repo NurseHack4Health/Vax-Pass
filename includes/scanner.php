@@ -36,7 +36,7 @@
 				qrInput.value = qrMsg;
 				result.style.display = 'block';
 
-				fetch('https://open-nis.org/vaxpass/verify', {
+				fetch('<?= BASE_URL . 'verify' ?>', {
 					method: 'POST',
 					body: qrMsg
 				})

@@ -27,7 +27,7 @@
                     require __DIR__ . '/../phpqrcode/lib/full/qrlib.php';
                     echo QRcode::svg($_GET['data']); // QR code
                     echo '<br />';
-                    echo '<p><strong>' . Basic::decrypt( base64_decode($_GET['data']), 'PasswordHere', 'vaxv1' ) . '</strong></p>'; // Decrypted QR data
+                    echo '<p><strong>' . Basic::decrypt( base64_decode($_GET['data']), PASS_PHRASE, 'vaxv1' ) . '</strong></p>'; // Decrypted QR data
                     exit;
                 }
 
@@ -38,9 +38,12 @@
                     $dose = htmlspecialchars($_POST['dose']);
                     $date = htmlspecialchars($_POST['date']);
                     $location = htmlspecialchars($_POST['location']);
+
+                    if (! empty($_POST['location'])) setcookie('location', $location); // Remember location
+
                     $plaintext = $name . ' completed the ' . $dose . ' of the COVID-19 vaccine on ' . $date . ' at ' . $location . '.';
 
-                    $encrypted = Basic::encrypt($plaintext, 'PasswordHere', 'vaxv1');
+                    $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'vaxv1');
                     $data = base64_encode($encrypted);
                     $link = BASE_URL . 'generate?data=' . $data;
 
@@ -63,15 +66,24 @@
                 <label for="date">Date</label>
                 <input class="form-control" type="date" placeholder="Date" aria-label="Date" name="date" required><br />
                 <label for="location">Location</label>
-                <input class="form-control" type="text" placeholder="Location" aria-label="Location" name="location" value="Vaccine Site Alpha Bravo" readonly><br />
+                <input class="form-control" type="text" placeholder="Location" aria-label="Location" id="location" name="location" value="<?php if (! empty($_COOKIE['location'])) echo $_COOKIE['location']; ?>" <?php if (! empty($_COOKIE['location'])) echo 'readonly'; ?>><br />
                 <label for="email">Email</label>
+                <small>(Email functionality disabled.)</small>
                 <input class="form-control" type="email" placeholder="Email" aria-label="Email" name="email" required><br />
-                <button class="btn btn-outline-success my-2 my-sm-0" type="submit" name="generate">Generate</button>
+                <button class="btn btn-outline-success" type="submit" name="generate">Generate</button>
+                <button class="btn btn-outline-primary" type="button" onclick="resetLocation()">Reset Location</button>
                 </form>
                 </div>
             </div>
 
         </main>
+
+        <script>
+        	function resetLocation() {
+        		document.querySelector('#location').value = '';
+        		document.querySelector('#location').removeAttribute('readonly');
+        	}
+        </script>
   
     </body>
 </html>

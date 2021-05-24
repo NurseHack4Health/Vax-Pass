@@ -1,6 +1,7 @@
 <?php
 
 define('BASE_URL', 'http://localhost/vaxpass/'); // Base URL
+define('PASS_PHRASE', 'PasswordHere'); // Encryption passphrase
 
 require __DIR__ . '/basic/Basic.php'; // BasicPHP class library
 
