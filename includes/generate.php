@@ -24,10 +24,10 @@
                 <?php
                 // Display QR code
                 if (! empty($_GET['data'])) {
-                    require __DIR__ . '/../phpqrcode/lib/full/qrlib.php';
+                    require __DIR__ . '/../phpqrcode/lib/merged/phpqrcode.php';
                     echo QRcode::svg($_GET['data']); // QR code
                     echo '<br />';
-                    echo '<p><strong>' . Basic::decrypt( base64_decode($_GET['data']), PASS_PHRASE, 'vaxv1' ) . '</strong></p>'; // Decrypted QR data
+                    echo '<p>' . Basic::decrypt( base64_decode($_GET['data']), PASS_PHRASE, 'vaxv1' ) . '</p>'; // Decrypted QR data
                     exit;
                 }
 
@@ -41,7 +41,7 @@
 
                     if (! empty($_POST['location'])) setcookie('location', $location); // Remember location
 
-                    $plaintext = $name . ' completed the ' . $dose . ' of the COVID-19 vaccine on ' . $date . ' at ' . $location . '.';
+                    $plaintext = 'Name: <strong>' . $name . '</strong><br />Dose: <strong>' . $dose . '</strong><br />Date: <strong>' . $date . '</strong><br />Location: <strong>' . $location . '</strong>';
 
                     $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'vaxv1');
                     $data = base64_encode($encrypted);

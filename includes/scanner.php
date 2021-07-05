@@ -18,31 +18,41 @@
 			<div id="reader" width="600px" height="600px"></div>
 			<div id="result" style="display: none;"></div>
 			<br />
-			<form onsubmit="event.preventDefault()" method="post">
+			<form id="form" style="display: none;" onsubmit="event.preventDefault()" method="post">
 				<div class="form-group">
-					<label for="qr-input-value">Data in QR Code: </label>
+					<label for="qr-input-value">QR Code Data: </label>
 					<input type="text" class="form-control" id="qr-input-value" name="qr-input-value" readonly />
 				</div>
-				<button type="reset" class="btn btn-primary" onclick="resetForm()">Reset</button>
+				<button type="reset" class="btn btn-primary" onclick="resetForm()">Scan</button>
 			</form>
 		</div>
 
 		<script type="text/javascript" src="html5-qrcode/html5-qrcode.min.js"></script>
 		<script>
+			const scanner = document.getElementById('reader');
 			const qrInput = document.getElementById('qr-input-value');
 			const result = document.getElementById('result');
+			const form = document.getElementById('form');
 
 			function onScanSuccess(qrMsg) {
 				qrInput.value = qrMsg;
+				scanner.style.display = 'none';
 				result.style.display = 'block';
+				form.style.display = 'block';
 
 				fetch('<?= BASE_URL . 'verify' ?>', {
 					method: 'POST',
 					body: qrMsg
 				})
-				.then(res => res.text())
-				.then(function(data) {
-					result.innerHTML = '<br />The decrypted information in the QR code:<br /><strong>' + data + '</strong>';
+				.then((res) => {
+					if (res.status == 200) {
+						return res.text();
+					} else {
+						return 'Error: Invalid QR Code.';
+					}
+				})
+				.then((data) => {
+					result.innerHTML = '<br />Certificate Verification Result:<br /><strong>' + data + '</strong>';
 				});
 			}
 
@@ -51,12 +61,14 @@
 			}
 
 			let html5QrcodeScanner = new Html5QrcodeScanner(
-				'reader', { fps: 10, qrbox: 250 }, false);
+				'reader', { fps: 20, qrbox: 300 }, false);
 			html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
 			function resetForm() {
+				scanner.style.display = 'block';
 				result.style.display = 'none';
 				result.textContent = '';
+				form.style.display = 'none';
 			}
 		</script>
 
