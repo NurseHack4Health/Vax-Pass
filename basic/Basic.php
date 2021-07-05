@@ -13,7 +13,7 @@
  *          - include/require Basic.php.
  *
  * @package  BasicPHP
- * @version  v0.9.8
+ * @version  v0.9.9
  * @author   Raymund John Ang <raymund@open-nis.org>
  * @license  MIT License
  */
@@ -43,7 +43,7 @@ class Basic
 		// Number of subdirectories from hostname to index.php
 		$sub_dir = substr_count($_SERVER['SCRIPT_NAME'], '/') - 1;
 
-		if (empty($uri[$order+$sub_dir])) return FALSE;
+		if (! isset($uri[$order+$sub_dir])) return FALSE;
 
 		return $uri[$order+$sub_dir];
 	}
@@ -110,17 +110,17 @@ class Basic
 	/**
 	 * HTTP API request call using cURL
 	 *
-	 * @param string $http_method - HTTP request method (e.g. 'GET', 'POST')
 	 * @param string $url         - URL of API endpoint
+	 * @param string $http_method - HTTP request method (e.g. 'GET', 'POST')
 	 * @param array $data         - Request body in array format
 	 * @param string $user_token  - Basic 'username:password' or Bearer token
 	 *
 	 * @return (int|string)[]     - HTTP response code and result of cURL execution
 	 */
 
-	public static function apiCall($http_method, $url, $data=NULL, $user_token=NULL)
+	public static function apiCall($url, $http_method='GET', $data=NULL, $user_token=NULL)
 	{
-		if ( substr( strtolower( trim($url) ), 0, 8) !== 'https://' ) self::apiResponse(400, 'API URL should start with "https://".'); // Require HTTPS API URL
+		if ( substr( strtolower( trim($url) ), 0, 16) !== 'http://localhost' && substr( strtolower( trim($url) ), 0, 8) !== 'https://' ) self::apiResponse(400, 'API URL should start with "https://".'); // Require HTTPS API URL
 
 		$auth_scheme = ( stristr($user_token, ':') ) ? 'Basic' : 'Bearer'; // Authorization scheme
 		$auth_cred = ( $auth_scheme === 'Basic' ) ? base64_encode($user_token) : $user_token; // Credentials
@@ -189,16 +189,15 @@ class Basic
 
 	/**
 	 * Prevent Cross-Site Request Forgery (CSRF)
-	 * Create a per request token to handle CSRF using sessions
+	 * Per request token using secure & httponly cookie
 	 * Basic::setFirewall() should be executed. $verify_csrf_token = TRUE (default)
 	 */
 
 	public static function csrfToken()
 	{
-		if (defined('VERIFY_CSRF_TOKEN') && VERIFY_CSRF_TOKEN) {
-			$_SESSION['csrf-token'] = bin2hex( random_bytes(32) );
-			return $_SESSION['csrf-token'];
-		}
+		$token = bin2hex( random_bytes(32) );
+		setcookie('csrf-token', $token, NULL, NULL, NULL, TRUE, TRUE);
+		return $token;
 	}
 
 	/**
@@ -216,9 +215,9 @@ class Basic
 	public static function encrypt($plaintext=NULL, $pass_phrase=NULL, $header='encv1', $cipher='aes-256-gcm', $hmac_algo='sha512')
 	{
 		if (! isset($plaintext)) self::apiResponse(500, 'Set plaintext for encryption.');
-		if (! isset($pass_phrase)) self::apiResponse(500, 'Set passphrase as a constant.');
+		if (! isset($pass_phrase)) self::apiResponse(500, 'Set passphrase for the encryption key, or link for the encryption API.');
 
-		if ($cipher !== 'aes-256-gcm' && $cipher !== 'aes-256-ctr' && $cipher !== 'aes-256-cbc' && $cipher !== 'aes-128-gcm' && $cipher !== 'aes-128-ctr' && $cipher !== 'aes-128-cbc') self::apiResponse(500, "Encryption cipher method should either be 'aes-256-gcm', 'aes-256-ctr', 'aes-256-cbc', 'aes-128-gcm', 'aes-128-ctr' or 'aes-128-cbc'.");
+		if ($cipher !== 'aes-256-gcm' && $cipher !== 'aes-256-ctr' && $cipher !== 'aes-256-cbc') self::apiResponse(500, "Encryption cipher method should either be 'aes-256-gcm', 'aes-256-ctr', 'aes-256-cbc'.");
 
 		// Encryption - Version 1
 		if (! function_exists('encrypt_v1')) {
@@ -230,7 +229,7 @@ class Basic
 
 				if ( filter_var($pass_phrase, FILTER_VALIDATE_URL) ) {
 					$api = $pass_phrase . '?action=encrypt';
-					$response = Basic::apiCall('POST', $api, ['key' => $pass_phrase]);
+					$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
 
 					if ($response['code'] !== 200) Basic::apiResponse($response['code']);
 					
@@ -242,13 +241,13 @@ class Basic
 				$encKey = hash_hkdf('sha256', $masterKey, 32, 'aes-256-encryption', $salt); // Data Encryption key
 				$hmacKey = hash_hkdf('sha256', $masterKey, 32, 'sha-256-authentication', $salt); // HMAC key
 
-				if ($cipher === 'aes-256-gcm' || $cipher === 'aes-128-gcm') {
+				if ($cipher === 'aes-256-gcm') {
 
 					$ciphertext = openssl_encrypt($plaintext, $cipher, $encKey, $options=0, $iv, $tag);
 					$encrypted = $header . '.' . base64_encode($ciphertext) . '.' . base64_encode($tag) . '.' . base64_encode($salt);
 
 					if ( isset($api) && $response['code'] === 200 ) {
-						$response = Basic::apiCall('POST', $api, ['key' => $pass_phrase]);
+						$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
 						$data = json_decode($response['data'], TRUE);
 						$dek_token = $data['key']; // Encrypted passphrase token
 
@@ -264,7 +263,7 @@ class Basic
 					$encrypted = $header . '.' . base64_encode($ciphertext) . '.' . base64_encode($hash) . '.' . base64_encode($salt);
 
 					if ( isset($api) && $response['code'] === 200 ) {
-						$response = Basic::apiCall('POST', $api, ['key' => $pass_phrase]);
+						$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
 						$data = json_decode($response['data'], TRUE);
 						$dek_token = $data['key'];
 
@@ -299,20 +298,20 @@ class Basic
 	public static function decrypt($encrypted=NULL, $pass_phrase=NULL, $header='encv1', $cipher='aes-256-gcm', $hmac_algo='sha512')
 	{
 		if (! isset($encrypted)) self::apiResponse(500, 'Set encryption token for decryption.');
-		if (! isset($pass_phrase)) self::apiResponse(500, 'Set passphrase as a constant.');
+		if (! isset($pass_phrase)) self::apiResponse(500, 'Set passphrase for the encryption key, or link for the encryption API.');
 
-		if ($cipher !== 'aes-256-gcm' && $cipher !== 'aes-256-ctr' && $cipher !== 'aes-256-cbc' && $cipher !== 'aes-128-gcm' && $cipher !== 'aes-128-ctr' && $cipher !== 'aes-128-cbc') self::apiResponse(500, "Encryption cipher method should either be 'aes-256-gcm', 'aes-256-ctr', 'aes-256-cbc', 'aes-128-gcm', 'aes-128-ctr' or 'aes-128-cbc'.");
+		if ($cipher !== 'aes-256-gcm' && $cipher !== 'aes-256-ctr' && $cipher !== 'aes-256-cbc') self::apiResponse(500, "Encryption cipher method should either be 'aes-256-gcm', 'aes-256-ctr', 'aes-256-cbc'.");
 
 		// Decryption - Version 1
 		if (! function_exists('decrypt_v1')) {
 
 			function decrypt_v1($encrypted, $pass_phrase, $header, $cipher, $hmac_algo) {
 
-				if ($cipher === 'aes-256-gcm' || $cipher === 'aes-128-gcm') {
+				if ($cipher === 'aes-256-gcm') {
 
 					if ( filter_var($pass_phrase, FILTER_VALIDATE_URL) ) {
 						$api = $pass_phrase . '?action=decrypt';
-						$response = Basic::apiCall('POST', $api, ['key' => $pass_phrase]);
+						$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
 
 						if ($response['code'] !== 200) Basic::apiResponse($response['code']);
 
@@ -332,7 +331,7 @@ class Basic
 					}
 
 					if ( isset($api) && $response['code'] === 200 ) {
-						$response = Basic::apiCall('POST', $api, ['key' => $header_dek . '.' . $ciphertext_dek . '.' . $tag_dek . '.' . $salt_dek]);
+						$response = Basic::apiCall($api, 'POST', ['key' => $header_dek . '.' . $ciphertext_dek . '.' . $tag_dek . '.' . $salt_dek]);
 						$data = json_decode($response['data'], TRUE);
 						$pass_phrase = $data['key']; // Decrypted random password
 					}
@@ -345,17 +344,17 @@ class Basic
 					$plaintext = openssl_decrypt($ciphertext, $cipher, $encKey, $options=0, $iv, $tag);
 
 					// GCM authentication
-					if ($plaintext !== FALSE) {
+					if ($plaintext) {
 						return $plaintext;
 					} else {
-						exit ('Please verify authenticity of ciphertext.');
+						return FALSE;
 					}
 
 				} else {
 
 					if ( filter_var($pass_phrase, FILTER_VALIDATE_URL) ) {
 						$api = $pass_phrase . '?action=decrypt';
-						$response = Basic::apiCall('POST', $api, ['key' => $pass_phrase]);
+						$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
 
 						if ($response['code'] !== 200) Basic::apiResponse($response['code']);
 
@@ -375,7 +374,7 @@ class Basic
 					}
 
 					if ( isset($api) && $response['code'] === 200 ) {
-						$response = Basic::apiCall('POST', $api, ['key' => $header_dek . '.' . $ciphertext_dek . '.' . $hash_dek . '.' . $salt_dek]);
+						$response = Basic::apiCall($api, 'POST', ['key' => $header_dek . '.' . $ciphertext_dek . '.' . $hash_dek . '.' . $salt_dek]);
 						$data = json_decode($response['data'], TRUE);
 						$pass_phrase = $data['key']; // Decrypted passphrase
 					}
@@ -392,7 +391,7 @@ class Basic
 						return openssl_decrypt($ciphertext, $cipher, $encKey, $options=0, $iv);
 						}
 					else {
-						exit ('Please verify authenticity of ciphertext.');
+						return FALSE;
 					}
 
 				}
@@ -421,9 +420,9 @@ class Basic
 
 	public static function setErrorReporting($boolean=TRUE)
 	{
-		if ($boolean === TRUE) {
+		if ($boolean) {
 			error_reporting(E_ALL);
-		} elseif ($boolean === FALSE) {
+		} elseif (! $boolean) {
 			error_reporting(0);
 		} else {
 			self::apiResponse(500, 'Boolean parameter for Basic::setErrorReporting() can only be TRUE or FALSE.');
@@ -456,18 +455,14 @@ class Basic
 		}
 
 		// Verify CSRF token
-		if ($verify_csrf_token === TRUE) {
-			define('VERIFY_CSRF_TOKEN', TRUE); // Used for Basic::csrfToken()
-			session_set_cookie_params(NULL, NULL, NULL, TRUE, TRUE); // Secure and Httponly
-			session_start(); // Require sessions
-
-			if (isset($_POST['csrf-token']) && isset($_SESSION['csrf-token']) && ! hash_equals($_POST['csrf-token'], $_SESSION['csrf-token'])) {
+		if ($verify_csrf_token) {
+			if (isset($_POST['csrf-token']) && isset($_COOKIE['csrf-token']) && ! hash_equals($_POST['csrf-token'], $_COOKIE['csrf-token'])) {
 				self::apiResponse(400, 'Please check authenticity of CSRF token.');
 			}
 		}
 
 		// Automatically escape $_POST values using htmlspecialchars()
-		if ($post_auto_escape === TRUE && isset($_POST)) {
+		if ($post_auto_escape && isset($_POST)) {
 			foreach ($_POST as $key => $value) {
 				$_POST[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 			}
@@ -517,6 +512,8 @@ class Basic
 
 	public static function setAutoloadClass($classes)
 	{
+		if (! is_array($classes)) Basic::apiResponse(500, 'Basic::setAutoloadClass() argument should be an array.');
+
 		define('AUTOLOADED_FOLDERS', $classes);
 		spl_autoload_register(function ($class_name) {
 			foreach (AUTOLOADED_FOLDERS as $folder) {
@@ -555,10 +552,13 @@ class Basic
 	 * Encryption API - Key-Encryption-Key (KEK)
 	 * Credits: https://github.com/ray-ang/encryption-api
 	 *
-	 * @param string $pass_phrase	- KEK master key
+	 * @param string $pass_phrase - KEK master key
 	 */
 
-	public static function apiEncrypt($pass_phrase) {
+	public static function setEncryptApi($pass_phrase)
+	{
+		if (! isset($pass_phrase)) self::apiResponse(500, 'Set passphrase for the encryption key.');
+
 		/* Require POST method */
 		if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 			self::apiResponse(405, "Method should be 'POST'.");
