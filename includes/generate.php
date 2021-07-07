@@ -44,7 +44,7 @@
 
                 // Generate and email QR code
                 if (isset($_POST['generate'])) {
-                    $email = $_POST['email'];
+                    $email = htmlspecialchars($_POST['email']);
                     $name = htmlspecialchars($_POST['name']);
                     $dose = htmlspecialchars($_POST['dose']);
                     $date = htmlspecialchars($_POST['date']);
@@ -52,7 +52,7 @@
 
                     if (! empty($_POST['location'])) setcookie('location', $location); // Remember location
 
-                    $plaintext = json_encode(['Name' => $name, 'Dose' => $dose, 'Date' => $date, 'Location' => $location]);
+                    $plaintext = json_encode(['Name' => $name, 'Email' => $email, 'Dose' => $dose, 'Date' => $date, 'Location' => $location]);
 
                     $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'vaxv1');
                     $data = base64_encode($encrypted);
