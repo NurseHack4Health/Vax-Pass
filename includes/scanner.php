@@ -72,7 +72,7 @@
 			}
 
 			let html5QrcodeScanner = new Html5QrcodeScanner(
-				'reader', { fps: 20, qrbox: 300 }, false);
+				'reader', { fps: 10, qrbox: 250 }, false);
 			html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
 			function resetForm() {
