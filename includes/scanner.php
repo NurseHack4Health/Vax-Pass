@@ -52,7 +52,18 @@
 					}
 				})
 				.then((data) => {
-					result.innerHTML = '<br />Certificate Verification Result:<br /><strong>' + data + '</strong>';
+					if (data == 'Error: Invalid QR Code.') {
+						result.innerHTML = '<div class="alert alert-warning" role="alert"><strong>Error: Invalid QR Code.</strong></div>';
+						return;
+					}
+
+					let obj = JSON.parse(data);
+					let output = '<div class="alert alert-success" role="alert"><strong>Valid Certificate</strong></div><p><em>Certificate Details</em></p>';
+					for (const [key, value] of Object.entries(obj)) {
+					  output += `${key}: <strong>${value}</strong><br />`;
+					}
+
+					result.innerHTML = output;
 				});
 			}
 

@@ -27,7 +27,15 @@
                     require __DIR__ . '/../phpqrcode/lib/merged/phpqrcode.php';
                     echo QRcode::svg($_GET['data']); // QR code
                     echo '<br />';
-                    echo '<p>' . Basic::decrypt( base64_decode($_GET['data']), PASS_PHRASE, 'vaxv1' ) . '</p>'; // Decrypted QR data
+
+                    $data = json_decode( Basic::decrypt(base64_decode($_GET['data']), PASS_PHRASE, 'vaxv1'), TRUE );
+                    $output = '<p>';
+
+                    foreach ($data as $key => $value) {
+                        $output .= "$key: <strong>$value</strong><br />";
+                    }
+
+                    echo $output . '</p>'; // Decrypted QR data
                     exit;
                 }
 
@@ -41,7 +49,7 @@
 
                     if (! empty($_POST['location'])) setcookie('location', $location); // Remember location
 
-                    $plaintext = 'Name: <strong>' . $name . '</strong><br />Dose: <strong>' . $dose . '</strong><br />Date: <strong>' . $date . '</strong><br />Location: <strong>' . $location . '</strong>';
+                    $plaintext = json_encode(['Name' => $name, 'Dose' => $dose, 'Date' => $date, 'Location' => $location]);
 
                     $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'vaxv1');
                     $data = base64_encode($encrypted);
