@@ -2,8 +2,7 @@
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') Basic::apiResponse(405, 'Only "POST" request method allowed.'); // Only allow POST request
 
-$data = file_get_contents('php://input'); // Request body
-$encrypted = base64_decode($data); // Encrypted data
+$encrypted = file_get_contents('php://input'); // Encrypted data
 
 if ( substr($encrypted, 0, 5) !== 'vaxv1' ) Basic::apiResponse(400);
 

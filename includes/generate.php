@@ -25,12 +25,15 @@
                 // Display QR code
                 if (! empty($_GET['data'])) {
                     require __DIR__ . '/../phpqrcode/lib/merged/phpqrcode.php';
-                    echo QRcode::svg($_GET['data']); // QR code
+
+                    $encrypted = base64_decode($_GET['data']);
+                    $plaintext = Basic::decrypt($encrypted, PASS_PHRASE, 'vaxv1');
+                    $data = json_decode($plaintext, TRUE);
+
+                    echo QRcode::svg($encrypted); // QR code
                     echo '<br />';
 
-                    $data = json_decode( Basic::decrypt(base64_decode($_GET['data']), PASS_PHRASE, 'vaxv1'), TRUE );
                     $output = '<p>';
-
                     foreach ($data as $key => $value) {
                         $output .= "$key: <strong>$value</strong><br />";
                     }
