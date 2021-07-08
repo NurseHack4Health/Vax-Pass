@@ -58,7 +58,7 @@
                     $data = base64_encode($encrypted);
                     $link = BASE_URL . 'generate?data=' . $data;
 
-                    /* Place script here to call mail API to sent link to QR code. */
+                    /* Place script here to call mail API to send link to QR code. */
 
                     header('Location: ' . $link); // Display QR code
                     exit;
