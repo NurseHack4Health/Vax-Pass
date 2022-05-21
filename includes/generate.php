@@ -27,7 +27,7 @@
                     require __DIR__ . '/../phpqrcode/lib/merged/phpqrcode.php';
 
                     $encrypted = base64_decode($_GET['data']);
-                    $plaintext = Basic::decrypt($encrypted, PASS_PHRASE, 'vaxv1');
+                    $plaintext = Basic::decrypt($encrypted, PASS_PHRASE, 'encv2');
                     $data = json_decode($plaintext, TRUE);
 
                     echo QRcode::svg($encrypted); // QR code
@@ -54,7 +54,7 @@
 
                     $plaintext = json_encode(['Name' => $name, 'Email' => $email, 'Dose' => $dose, 'Date' => $date, 'Location' => $location]);
 
-                    $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'vaxv1');
+                    $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'encv2');
                     $data = base64_encode($encrypted);
                     $link = BASE_URL . 'generate?data=' . $data;
 
