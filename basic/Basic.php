@@ -1,21 +1,19 @@
 <?php
 
 /**
- * BasicPHP - A frameworkless library-based approach for building web applications
- *          - and application programming interfaces or API's.
- *          - The aim of the project is for developers to build applications that
- *          - are framework-independent using native PHP functions and API's.
+ * BasicPHP - A frameworkless class library for developing web applications and
+ *          - application programming interfaces or API's.
  *          -
- *          - To embed the application to any framework, copy BasicPHP class library
- *          - (Basic.php), and the 'classes', 'models', 'views' and 'controllers'
- *          - folders one (1) folder above the front controller (index.php) of the
- *          - chosen framework. In the controller file, at the top of the script,
- *          - include/require Basic.php.
+ *          - The purpose of the library is for developers to build applications
+ *          - and services that are framework agnostic using native PHP functions
+ *          - and API's.
  *
- * @package  BasicPHP
- * @version  v0.9.9
- * @author   Raymund John Ang <raymund@open-nis.org>
- * @license  MIT License
+ * @package   BasicPHP
+ * @version   v0.9.10
+ * @link      https://github.com/ray-ang/basicphp
+ * @author    Raymund John Ang <raymund@open-nis.org>
+ * @copyright Copyright (c) 2019-2022 Raymund John Ang <raymund@open-nis.org>
+ * @license   MIT License
  */
 
 class Basic
@@ -219,13 +217,50 @@ class Basic
 
 		if ($cipher !== 'aes-256-gcm' && $cipher !== 'aes-256-ctr' && $cipher !== 'aes-256-cbc') self::apiResponse(500, "Encryption cipher method should either be 'aes-256-gcm', 'aes-256-ctr', 'aes-256-cbc'.");
 
+		// Encryption - Version 2
+		if (! function_exists('encrypt_v2')) {
+
+			function encrypt_v2($plaintext, $pass_phrase, $header, $cipher, $hmac_algo) {
+
+				if ( filter_var($pass_phrase, FILTER_VALIDATE_URL) ) {
+					$api = $pass_phrase . '?action=encrypt';
+					$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
+
+					if ($response['code'] !== 200) Basic::apiResponse($response['code']);
+					
+					$pass_phrase = bin2hex( random_bytes(32) ); // Random password
+				}
+
+				// Derive keys
+				$salt = hash('sha3-256', $pass_phrase);
+				$masterKey = hash_pbkdf2('sha256', $pass_phrase, $salt, 10000); // Master key
+				$encKey = hash_hkdf('sha256', $masterKey, 32, 'aes-256-encryption', $salt); // Data Encryption key
+
+				$ciphertext = openssl_encrypt($plaintext, $cipher, $encKey, $options=0);
+				$encrypted = $header . '.' . $ciphertext;
+
+				if ( isset($api) && $response['code'] === 200 ) {
+					$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
+					$data = json_decode($response['data'], TRUE);
+					$dek_token = $data['key'];
+
+					return str_replace('=', '', $encrypted . '.' . $dek_token); // Strip off '='
+				} else {
+					return str_replace('=', '', $encrypted); // Strip off '='
+				}
+
+			}
+
+		}
+
 		// Encryption - Version 1
 		if (! function_exists('encrypt_v1')) {
 
 			function encrypt_v1($plaintext, $pass_phrase, $header, $cipher, $hmac_algo) {
 
-				$iv = random_bytes( openssl_cipher_iv_length($cipher) ); // Initialization Vector
-				$salt = $iv; // Salt
+				$nonce = random_bytes( openssl_cipher_iv_length($cipher) ); // Number once
+				$iv = $nonce; // Initialization Vector
+				$salt = $nonce; // Salt
 
 				if ( filter_var($pass_phrase, FILTER_VALIDATE_URL) ) {
 					$api = $pass_phrase . '?action=encrypt';
@@ -244,7 +279,7 @@ class Basic
 				if ($cipher === 'aes-256-gcm') {
 
 					$ciphertext = openssl_encrypt($plaintext, $cipher, $encKey, $options=0, $iv, $tag);
-					$encrypted = $header . '.' . base64_encode($ciphertext) . '.' . base64_encode($tag) . '.' . base64_encode($salt);
+					$encrypted = $header . '.' . base64_encode($ciphertext) . '.' . base64_encode($tag) . '.' . base64_encode($nonce);
 
 					if ( isset($api) && $response['code'] === 200 ) {
 						$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
@@ -260,7 +295,7 @@ class Basic
 
 					$ciphertext = openssl_encrypt($plaintext, $cipher, $encKey, $options=0, $iv);
 					$hash = hash_hmac($hmac_algo, $ciphertext, $hmacKey);
-					$encrypted = $header . '.' . base64_encode($ciphertext) . '.' . base64_encode($hash) . '.' . base64_encode($salt);
+					$encrypted = $header . '.' . base64_encode($ciphertext) . '.' . base64_encode($hash) . '.' . base64_encode($nonce);
 
 					if ( isset($api) && $response['code'] === 200 ) {
 						$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
@@ -279,7 +314,8 @@ class Basic
 		}
 
 		/** Version-based encryption */
-		if ( substr( ltrim($plaintext), 0, 5 ) !== $header ) return encrypt_v1($plaintext, $pass_phrase, $header, $cipher, $hmac_algo);
+		if ( $header == 'encv2' ) return encrypt_v2($plaintext, $pass_phrase, $header='encv2', $cipher='aes-256-ecb', $hmac_algo);
+		if ( $header == 'encv1' ) return encrypt_v1($plaintext, $pass_phrase, $header, $cipher, $hmac_algo);
 		return $plaintext;
 	}
 
@@ -302,6 +338,39 @@ class Basic
 
 		if ($cipher !== 'aes-256-gcm' && $cipher !== 'aes-256-ctr' && $cipher !== 'aes-256-cbc') self::apiResponse(500, "Encryption cipher method should either be 'aes-256-gcm', 'aes-256-ctr', 'aes-256-cbc'.");
 
+		// Decryption - Version 2
+		if (! function_exists('decrypt_v2')) {
+
+			function decrypt_v2($encrypted, $pass_phrase, $header, $cipher, $hmac_algo) {
+
+				if ( filter_var($pass_phrase, FILTER_VALIDATE_URL) ) {
+					$api = $pass_phrase . '?action=decrypt';
+					$response = Basic::apiCall($api, 'POST', ['key' => $pass_phrase]);
+
+					if ($response['code'] !== 200) Basic::apiResponse($response['code']);
+
+					list($header, $ciphertext, $header_dek, $ciphertext_dek) = explode('.', $encrypted);
+				} else {
+					list($header, $ciphertext) = explode('.', $encrypted);
+				}
+
+				if ( isset($api) && $response['code'] === 200 ) {
+					$response = Basic::apiCall($api, 'POST', ['key' => $header_dek . '.' . $ciphertext_dek]);
+					$data = json_decode($response['data'], TRUE);
+					$pass_phrase = $data['key']; // Decrypted passphrase
+				}
+
+				// Derive keys
+				$salt = hash('sha3-256', $pass_phrase);
+				$masterKey = hash_pbkdf2('sha256', $pass_phrase, $salt, 10000); // Master key
+				$encKey = hash_hkdf('sha256', $masterKey, 32, 'aes-256-encryption', $salt); // Encryption key
+
+				return openssl_decrypt($ciphertext, $cipher, $encKey, $options=0);
+
+			}
+
+		}
+
 		// Decryption - Version 1
 		if (! function_exists('decrypt_v1')) {
 
@@ -315,23 +384,25 @@ class Basic
 
 						if ($response['code'] !== 200) Basic::apiResponse($response['code']);
 
-						list($header, $ciphertext, $tag, $salt, $header_dek, $ciphertext_dek, $tag_dek, $salt_dek) = explode('.', $encrypted);
+						list($header, $ciphertext, $tag, $nonce, $header_dek, $ciphertext_dek, $tag_dek, $nonce_dek) = explode('.', $encrypted);
 
 						$ciphertext = base64_decode($ciphertext);
 						$tag = base64_decode($tag);
-						$salt = base64_decode($salt);
-						$iv = $salt; // Initialization Vector
+						$nonce = base64_decode($nonce); // Nonce
+						$iv = $nonce; // IV
+						$salt = $nonce; // Salt
 					} else {
-						list($header, $ciphertext, $tag, $salt) = explode('.', $encrypted);
+						list($header, $ciphertext, $tag, $nonce) = explode('.', $encrypted);
 
 						$ciphertext = base64_decode($ciphertext);
 						$tag = base64_decode($tag);
-						$salt = base64_decode($salt);
-						$iv = $salt; // Initialization Vector
+						$nonce = base64_decode($nonce); // Nonce
+						$iv = $nonce; // IV
+						$salt = $nonce; // Salt
 					}
 
 					if ( isset($api) && $response['code'] === 200 ) {
-						$response = Basic::apiCall($api, 'POST', ['key' => $header_dek . '.' . $ciphertext_dek . '.' . $tag_dek . '.' . $salt_dek]);
+						$response = Basic::apiCall($api, 'POST', ['key' => $header_dek . '.' . $ciphertext_dek . '.' . $tag_dek . '.' . $nonce_dek]);
 						$data = json_decode($response['data'], TRUE);
 						$pass_phrase = $data['key']; // Decrypted random password
 					}
@@ -358,23 +429,25 @@ class Basic
 
 						if ($response['code'] !== 200) Basic::apiResponse($response['code']);
 
-						list($header, $ciphertext, $hash, $salt, $header_dek, $ciphertext_dek, $hash_dek, $salt_dek) = explode('.', $encrypted);
+						list($header, $ciphertext, $hash, $nonce, $header_dek, $ciphertext_dek, $hash_dek, $nonce_dek) = explode('.', $encrypted);
 
 						$ciphertext = base64_decode($ciphertext);
 						$hash = base64_decode($hash);
-						$salt = base64_decode($salt);
-						$iv = $salt; // Initialization Vector
+						$nonce = base64_decode($nonce); // Nonce
+						$iv = $nonce; // IV
+						$salt = $nonce; // Salt
 					} else {
-						list($header, $ciphertext, $hash, $salt) = explode('.', $encrypted);
+						list($header, $ciphertext, $hash, $nonce) = explode('.', $encrypted);
 
 						$ciphertext = base64_decode($ciphertext);
 						$hash = base64_decode($hash);
-						$salt = base64_decode($salt);
-						$iv = $salt; // Initialization Vector
+						$nonce = base64_decode($nonce);
+						$iv = $nonce; // IV
+						$salt = $nonce; // Salt
 					}
 
 					if ( isset($api) && $response['code'] === 200 ) {
-						$response = Basic::apiCall($api, 'POST', ['key' => $header_dek . '.' . $ciphertext_dek . '.' . $hash_dek . '.' . $salt_dek]);
+						$response = Basic::apiCall($api, 'POST', ['key' => $header_dek . '.' . $ciphertext_dek . '.' . $hash_dek . '.' . $nonce_dek]);
 						$data = json_decode($response['data'], TRUE);
 						$pass_phrase = $data['key']; // Decrypted passphrase
 					}
@@ -401,7 +474,8 @@ class Basic
 		}
 
 		/** Version-based decryption */
-		if ( substr( ltrim($encrypted), 0, 5 ) === $header ) return decrypt_v1($encrypted, $pass_phrase, $header, $cipher, $hmac_algo);
+		if ( $header == 'encv2' ) return decrypt_v2($encrypted, $pass_phrase, $header='encv2', $cipher='aes-256-ecb', $hmac_algo);
+		if ( $header == 'encv1' ) return decrypt_v1($encrypted, $pass_phrase, $header, $cipher, $hmac_algo);
 		if (! isset($encrypted) || empty($encrypted)) { return ''; } // Return empty if $encrypted is not set or empty.
 		return $encrypted;
 	}
