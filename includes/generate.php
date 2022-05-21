@@ -25,15 +25,26 @@
                 // Display QR code
                 if (! empty($_GET['data'])) {
                     require __DIR__ . '/../phpqrcode/lib/merged/phpqrcode.php';
-                    echo QRcode::svg($_GET['data']); // QR code
+
+                    $encrypted = base64_decode($_GET['data']);
+                    $plaintext = Basic::decrypt($encrypted, PASS_PHRASE, 'encv2');
+                    $data = json_decode($plaintext, TRUE);
+
+                    echo QRcode::svg($encrypted); // QR code
                     echo '<br />';
-                    echo '<p>' . Basic::decrypt( base64_decode($_GET['data']), PASS_PHRASE, 'vaxv1' ) . '</p>'; // Decrypted QR data
+
+                    $output = '<p>';
+                    foreach ($data as $key => $value) {
+                        $output .= "$key: <strong>$value</strong><br />";
+                    }
+
+                    echo $output . '</p>'; // Decrypted QR data
                     exit;
                 }
 
                 // Generate and email QR code
                 if (isset($_POST['generate'])) {
-                    $email = $_POST['email'];
+                    $email = htmlspecialchars($_POST['email']);
                     $name = htmlspecialchars($_POST['name']);
                     $dose = htmlspecialchars($_POST['dose']);
                     $date = htmlspecialchars($_POST['date']);
@@ -41,13 +52,13 @@
 
                     if (! empty($_POST['location'])) setcookie('location', $location); // Remember location
 
-                    $plaintext = 'Name: <strong>' . $name . '</strong><br />Dose: <strong>' . $dose . '</strong><br />Date: <strong>' . $date . '</strong><br />Location: <strong>' . $location . '</strong>';
+                    $plaintext = json_encode(['Name' => $name, 'Email' => $email, 'Dose' => $dose, 'Date' => $date, 'Location' => $location]);
 
-                    $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'vaxv1');
+                    $encrypted = Basic::encrypt($plaintext, PASS_PHRASE, 'encv2');
                     $data = base64_encode($encrypted);
                     $link = BASE_URL . 'generate?data=' . $data;
 
-                    /* Place script here to call mail API to sent link to QR code. */
+                    /* Place script here to call mail API to send link to QR code. */
 
                     header('Location: ' . $link); // Display QR code
                     exit;

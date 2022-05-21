@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>Vax Pass Code Scanner</title>
+		<title>Vax Pass QR Scanner</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<link rel="icon" href="https://getbootstrap.com/docs/4.0/assets/img/favicons/favicon.ico">
@@ -14,7 +14,7 @@
 	<body>
 
 		<div class="container">
-			<h2>Vax Pass QR Code Scanner</h2>
+			<h2>Vax Pass QR Scanner</h2>
 			<div id="reader" width="600px" height="600px"></div>
 			<div id="result" style="display: none;"></div>
 			<br />
@@ -52,7 +52,18 @@
 					}
 				})
 				.then((data) => {
-					result.innerHTML = '<br />Certificate Verification Result:<br /><strong>' + data + '</strong>';
+					if (data == 'Error: Invalid QR Code.') {
+						result.innerHTML = '<div class="alert alert-warning" role="alert"><strong>Error: Invalid QR Code.</strong></div>';
+						return;
+					}
+
+					let obj = JSON.parse(data);
+					let output = '<div class="alert alert-success" role="alert"><strong>Valid Certificate</strong></div><p><em>Certificate Details</em></p>';
+					for (const [key, value] of Object.entries(obj)) {
+					  output += `${key}: <strong>${value}</strong><br />`;
+					}
+
+					result.innerHTML = output;
 				});
 			}
 
@@ -61,7 +72,7 @@
 			}
 
 			let html5QrcodeScanner = new Html5QrcodeScanner(
-				'reader', { fps: 20, qrbox: 300 }, false);
+				'reader', { fps: 10, qrbox: 250 }, false);
 			html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
 			function resetForm() {
